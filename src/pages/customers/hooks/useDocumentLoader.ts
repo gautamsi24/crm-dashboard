@@ -19,7 +19,7 @@
  *  - Manual retry             → increment `attempt` to re-trigger the effect.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { fetchDocumentMetadata, fetchDocument } from '@/lib/mockApi';
 import type { MockDocumentResult } from '@/lib/mockApi';
 import type { LoadPhase } from '@/types/document';

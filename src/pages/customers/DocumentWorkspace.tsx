@@ -11,32 +11,35 @@
  *              the affected section; shows a dismissible notification after.
  */
 
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import {
   X, FileText, Loader2, ChevronLeft, ChevronRight,
   AlertCircle, Wifi, WifiOff, RefreshCw, Eye,
-  MessageSquare, Scissors, Send, CheckCircle2, LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth }               from '@/contexts/AuthContext';
-import { useDocumentLoader }     from '@/pages/customers/hooks/useDocumentLoader';
-import { useDocumentResume }     from '@/pages/customers/hooks/useDocumentResume';
-import { useDocumentPresence }   from '@/pages/customers/hooks/useDocumentPresence';
-import { useDocumentComments }   from '@/pages/customers/hooks/useDocumentComments';
-import { useDocumentEdit }       from '@/pages/customers/hooks/useDocumentEdit';
-import { useTextSelection }      from '@/pages/customers/hooks/useTextSelection';
-import { CURRENT_USER }          from '@/types/document';
-import DocumentToolbar           from '@/pages/customers/workspace/DocumentToolbar';
-import PageNavigator             from '@/pages/customers/workspace/PageNavigator';
-import CommentsSidebar           from '@/pages/customers/workspace/CommentsSidebar';
-import type { Customer }         from '@/lib/mockApi';
-import type { PresenceUser }     from '@/types/document';
+import { useAuth }                  from '@/contexts/AuthContext';
+import { useDocumentLoader }        from '@/pages/customers/hooks/useDocumentLoader';
+import { useDocumentResume }        from '@/pages/customers/hooks/useDocumentResume';
+import { useDocumentPresence }      from '@/pages/customers/hooks/useDocumentPresence';
+import { useDocumentComments }      from '@/pages/customers/hooks/useDocumentComments';
+import { useDocumentEdit }          from '@/pages/customers/hooks/useDocumentEdit';
+import { useTextSelection }         from '@/pages/customers/hooks/useTextSelection';
+import { CURRENT_USER }             from '@/types/document';
+import DocumentToolbar              from '@/pages/customers/workspace/DocumentToolbar';
+import PageNavigator                from '@/pages/customers/workspace/PageNavigator';
+import CommentsSidebar              from '@/pages/customers/workspace/CommentsSidebar';
+import ResumePrompt                 from '@/pages/customers/workspace/ResumePrompt';
+import SplitNotificationBanner      from '@/pages/customers/workspace/SplitNotificationBanner';
+import EditStatusBar                from '@/pages/customers/workspace/EditStatusBar';
+import FloatingCommentBubble        from '@/pages/customers/workspace/FloatingCommentBubble';
+import { ConfirmModal }             from '@/components/ui/ConfirmModal';
+import type { Customer }            from '@/lib/mockApi';
+import type { PresenceUser }        from '@/types/document';
+import type { SplitNotification }   from '@/pages/customers/workspace/SplitNotificationBanner';
 
 function formatBytes(b: number) {
   return b >= 1_000_000 ? `${(b / 1_000_000).toFixed(1)} MB` : `${(b / 1_000).toFixed(0)} KB`;
 }
-
-interface SplitNotification { splitAfterPage: number; affectedUsers: PresenceUser[] }
 
 export default function DocumentWorkspace({
   customer, onClose,
@@ -66,11 +69,27 @@ export default function DocumentWorkspace({
   const [showComments,      setShowComments]      = useState(false);
   const [networkOnline,     setNetworkOnline]     = useState(navigator.onLine);
   const [showSplitDialog,   setShowSplitDialog]   = useState(false);
+  const [showDeleteDialog,  setShowDeleteDialog]  = useState(false);
   const [splitPageInput,    setSplitPageInput]    = useState(1);
   const [splitNotification, setSplitNotification] = useState<SplitNotification | null>(null);
-  const [showCommentForm,   setShowCommentForm]   = useState(false);
-  const [commentDraft,      setCommentDraft]      = useState('');
-  const [isSendingComment,  setSendingComment]    = useState(false);
+
+  // ── Pre-compute presence page map ─────────────────────────────────────────
+  // Avoids calling usersOnPage() (a filter) N times inside PageNavigator's
+  // render loop. O(M) build once per presence change instead of O(N×M).
+  const presencePageMap = useMemo(() => {
+    const map = new Map<number, PresenceUser[]>();
+    for (const u of presence.presence) {
+      const list = map.get(u.currentPage) ?? [];
+      list.push(u);
+      map.set(u.currentPage, list);
+    }
+    return map;
+  }, [presence.presence]);
+
+  const usersOnPageStable = useCallback(
+    (page: number) => presencePageMap.get(page) ?? [],
+    [presencePageMap],
+  );
 
   // ── Network ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -82,8 +101,8 @@ export default function DocumentWorkspace({
   // ── Reset on doc change ───────────────────────────────────────────────────
   useEffect(() => {
     documentEdit.stopEditing();
-    setShowComments(false); setShowSplitDialog(false);
-    setSplitNotification(null); setShowCommentForm(false); setCommentDraft('');
+    setShowComments(false); setShowSplitDialog(false); setShowDeleteDialog(false);
+    setSplitNotification(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId]);
 
@@ -102,62 +121,92 @@ export default function DocumentWorkspace({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loader.currentPage, documentEdit.isEditing]);
 
-  // Clear inline comment form when selection disappears
-  useEffect(() => {
-    if (!textSel.selection) { setShowCommentForm(false); setCommentDraft(''); }
-  }, [textSel.selection]);
-
   // ── Page navigation ───────────────────────────────────────────────────────
-  const handlePageChange = (page: number) => {
+  const handlePageChange = useCallback((page: number) => {
     loader.setCurrentPage(page); resume.savePosition(page);
-  };
+  }, [loader.setCurrentPage, resume.savePosition]);
 
   // ── Toolbar actions ───────────────────────────────────────────────────────
-  const handleAction = (key: string) => {
+  const handleAction = useCallback((key: string) => {
     if (key === 'edit')    { documentEdit.isEditing ? documentEdit.stopEditing() : documentEdit.startEditing(); return; }
     if (key === 'comment') { setShowComments(c => !c); return; }
     if (key === 'split')   { setSplitPageInput(Math.max(1, Math.min(loader.currentPage, totalPages - 1))); setShowSplitDialog(true); return; }
-  };
+    if (key === 'delete')  { setShowDeleteDialog(true); return; }
+  }, [documentEdit.isEditing, documentEdit.stopEditing, documentEdit.startEditing, loader.currentPage, totalPages]);
 
   // ── Split confirm ─────────────────────────────────────────────────────────
-  const handleSplitConfirm = () => {
+  const handleSplitConfirm = useCallback(() => {
     const affected = presence.presence.filter(u => u.currentPage > splitPageInput);
     setSplitNotification({ splitAfterPage: splitPageInput, affectedUsers: affected });
     setShowSplitDialog(false);
-  };
+  }, [presence.presence, splitPageInput]);
 
-  // ── Selection-based comment ───────────────────────────────────────────────
-  const handleSelectionCommentSubmit = async (e: { preventDefault(): void }) => {
-    e.preventDefault();
-    const text = commentDraft.trim();
-    if (!text || !textSel.selection) return;
-    setSendingComment(true);
-    try {
-      await docComments.addComment(loader.currentPage, text, CURRENT_USER, textSel.selection.text);
-      setCommentDraft(''); setShowCommentForm(false);
-      textSel.clearSelection();
-      setShowComments(true);
-    } finally { setSendingComment(false); }
-  };
+  // ── Delete confirm ────────────────────────────────────────────────────────
+  const handleDeleteConfirm = useCallback(() => {
+    // Production: await deleteDocument(documentId) then call onClose()
+    setShowDeleteDialog(false);
+    onClose();
+  }, [onClose]);
 
-  // ── Derived ───────────────────────────────────────────────────────────────
-  const isDocReady     = loader.phase === 'ready';
-  const displayContent = documentEdit.getPageContent(
-    loader.currentPage,
-    loader.doc?.pages[loader.currentPage - 1]?.content ?? '',
+  // ── Resume ────────────────────────────────────────────────────────────────
+  const handleResume = useCallback(() => {
+    if (resume.resumePage) handlePageChange(resume.resumePage);
+    resume.dismissPrompt();
+  }, [resume.resumePage, resume.dismissPrompt, handlePageChange]);
+
+  // ── Comment from text selection ───────────────────────────────────────────
+  const handleCommentPosted = useCallback(async (text: string, selectedText: string) => {
+    await docComments.addComment(loader.currentPage, text, CURRENT_USER, selectedText);
+    textSel.clearSelection();
+    setShowComments(true);
+  }, [docComments.addComment, loader.currentPage, textSel.clearSelection]);
+
+  // ── Panel toggle handlers ─────────────────────────────────────────────────
+  const handleTogglePageNav      = useCallback(() => setShowPageNav(v => !v), []);
+  const handleToggleComments     = useCallback(() => setShowComments(v => !v), []);
+  const handleDismissSplit       = useCallback(() => setSplitNotification(null), []);
+  const handleCloseSplitDialog   = useCallback(() => setShowSplitDialog(false), []);
+  const handleCloseDeleteDialog  = useCallback(() => setShowDeleteDialog(false), []);
+
+  // ── contentEditable input handler ─────────────────────────────────────────
+  const handleInput = useCallback(() => {
+    documentEdit.updatePageContent(
+      loader.currentPage,
+      editableRef.current?.textContent ?? '',
+    );
+  }, [documentEdit.updatePageContent, loader.currentPage]);
+
+  // ── Footer navigation ─────────────────────────────────────────────────────
+  const handlePrevPage = useCallback(
+    () => handlePageChange(Math.max(1, loader.currentPage - 1)),
+    [handlePageChange, loader.currentPage],
   );
-  const viewersHere    = presence.usersOnPage(loader.currentPage);
-  const affectedPrev   = presence.presence.filter(u => u.currentPage > splitPageInput);
+  const handleNextPage = useCallback(
+    () => handlePageChange(Math.min(totalPages || 1, loader.currentPage + 1)),
+    [handlePageChange, loader.currentPage, totalPages],
+  );
 
-  const bubbleStyle = textSel.selection ? {
-    position: 'fixed' as const,
-    top:  Math.min(textSel.selection.rect.bottom + 10, window.innerHeight - 240),
-    left: Math.max(16, Math.min(
-      textSel.selection.rect.left + textSel.selection.rect.width / 2 - 160,
-      window.innerWidth - 336,
-    )),
-    zIndex: 200,
-  } : undefined;
+  // ── Derived values ────────────────────────────────────────────────────────
+  const isDocReady = loader.phase === 'ready';
+
+  const displayContent = useMemo(
+    () => documentEdit.getPageContent(
+      loader.currentPage,
+      loader.doc?.pages[loader.currentPage - 1]?.content ?? '',
+    ),
+    // getPageContent is stable (useCallback); re-runs when page or doc changes
+    [documentEdit.getPageContent, loader.currentPage, loader.doc],
+  );
+
+  const viewersHere = useMemo(
+    () => usersOnPageStable(loader.currentPage),
+    [usersOnPageStable, loader.currentPage],
+  );
+
+  const affectedPrev = useMemo(
+    () => presence.presence.filter(u => u.currentPage > splitPageInput),
+    [presence.presence, splitPageInput],
+  );
 
   return (
     <>
@@ -216,42 +265,19 @@ export default function DocumentWorkspace({
 
         {/* ── Resume prompt ── */}
         {resume.showPrompt && resume.resumePage && (
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-5 py-2">
-            <p className="text-xs text-amber-800">
-              You were last on <span className="font-semibold">page {resume.resumePage}</span>. Continue?
-            </p>
-            <div className="flex gap-2">
-              <button onClick={() => { handlePageChange(resume.resumePage!); resume.dismissPrompt(); }}
-                className="rounded-md bg-amber-500 px-3 py-1 text-xs font-medium text-white hover:bg-amber-600">
-                Resume
-              </button>
-              <button onClick={resume.dismissPrompt}
-                className="rounded-md px-3 py-1 text-xs text-amber-700 hover:bg-amber-100">
-                Start from page 1
-              </button>
-            </div>
-          </div>
+          <ResumePrompt
+            resumePage={resume.resumePage}
+            onResume={handleResume}
+            onDismiss={resume.dismissPrompt}
+          />
         )}
 
         {/* ── Split notification ── */}
         {splitNotification && (
-          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-orange-100 bg-orange-50 px-5 py-2.5">
-            <div className="flex items-start gap-2 text-xs text-orange-800">
-              <Scissors className="mt-0.5 size-3.5 shrink-0 text-orange-500" />
-              <div>
-                <p className="font-semibold">Document split after page {splitNotification.splitAfterPage}.</p>
-                <p className="mt-0.5">
-                  {splitNotification.affectedUsers.length > 0
-                    ? `${splitNotification.affectedUsers.map(u => u.name).join(' and ')} were working on the affected section and have been notified.`
-                    : 'No other users were on the affected pages.'}
-                </p>
-              </div>
-            </div>
-            <button onClick={() => setSplitNotification(null)}
-              className="shrink-0 rounded px-2 py-0.5 text-[10px] text-orange-600 hover:bg-orange-100">
-              Dismiss
-            </button>
-          </div>
+          <SplitNotificationBanner
+            notification={splitNotification}
+            onDismiss={handleDismissSplit}
+          />
         )}
 
         {/* ── Toolbar ── */}
@@ -261,31 +287,16 @@ export default function DocumentWorkspace({
           showComments={showComments}
           isDocReady={isDocReady}
           onAction={handleAction}
-          onTogglePageNav={() => setShowPageNav(v => !v)}
-          onToggleComments={() => setShowComments(v => !v)}
+          onTogglePageNav={handleTogglePageNav}
+          onToggleComments={handleToggleComments}
         />
 
         {/* ── Edit mode status bar (auto-save indicator + Done) ── */}
         {documentEdit.isEditing && (
-          <div className="flex shrink-0 items-center justify-between border-b border-amber-200 bg-amber-50 px-5 py-1.5">
-            <span className="flex items-center gap-1.5 text-xs">
-              {documentEdit.saveStatus === 'saving' && (
-                <><Loader2 className="size-3 animate-spin text-amber-500" /><span className="text-amber-600">Saving…</span></>
-              )}
-              {documentEdit.saveStatus === 'saved' && (
-                <><CheckCircle2 className="size-3 text-emerald-500" /><span className="text-emerald-600">Saved</span></>
-              )}
-              {documentEdit.saveStatus === 'idle' && (
-                <span className="text-amber-500">Edit mode — changes save automatically</span>
-              )}
-            </span>
-            <button
-              onClick={documentEdit.stopEditing}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
-            >
-              <LogOut className="size-3" /> Done editing
-            </button>
-          </div>
+          <EditStatusBar
+            saveStatus={documentEdit.saveStatus}
+            onStopEditing={documentEdit.stopEditing}
+          />
         )}
 
         {/* ── Loading progress ── */}
@@ -315,7 +326,7 @@ export default function DocumentWorkspace({
             <PageNavigator
               totalPages={totalPages} pagesReady={loader.pagesReady}
               currentPage={loader.currentPage} onPageSelect={handlePageChange}
-              usersOnPage={presence.usersOnPage}
+              usersOnPage={usersOnPageStable}
             />
           )}
 
@@ -371,12 +382,7 @@ export default function DocumentWorkspace({
                       ref={editableRef}
                       contentEditable
                       suppressContentEditableWarning
-                      onInput={() => {
-                        documentEdit.updatePageContent(
-                          loader.currentPage,
-                          editableRef.current?.textContent ?? '',
-                        );
-                      }}
+                      onInput={handleInput}
                       className="flex-1 overflow-y-auto bg-amber-50/40 p-6 font-mono text-xs leading-relaxed text-gray-800 outline-none whitespace-pre-wrap"
                       style={{ minHeight: 0 }}
                     />
@@ -417,7 +423,8 @@ export default function DocumentWorkspace({
             {isDocReady ? `${totalPages} pages · ${formatBytes(customer?.document.sizeBytes ?? 0)}` : loader.message}
           </p>
           <div className="flex items-center gap-2">
-            <button onClick={() => handlePageChange(Math.max(1, loader.currentPage - 1))}
+            <button
+              onClick={handlePrevPage}
               disabled={loader.currentPage <= 1 || !isDocReady}
               className="flex size-7 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40">
               <ChevronLeft className="size-4" />
@@ -425,7 +432,8 @@ export default function DocumentWorkspace({
             <span className="text-xs font-medium text-gray-700">
               {loader.currentPage} / {totalPages || '—'}
             </span>
-            <button onClick={() => handlePageChange(Math.min(totalPages || 1, loader.currentPage + 1))}
+            <button
+              onClick={handleNextPage}
               disabled={loader.currentPage >= totalPages || !isDocReady}
               className="flex size-7 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40">
               <ChevronRight className="size-4" />
@@ -434,97 +442,66 @@ export default function DocumentWorkspace({
         </footer>
 
         {/* ── Split dialog ── */}
-        {showSplitDialog && (
-          <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/30">
-            <div className="w-96 rounded-2xl bg-white p-6 shadow-2xl">
-              <h3 className="mb-1 text-sm font-bold text-gray-900">Split Document</h3>
-              <p className="mb-4 text-xs text-gray-500">
-                Creates two documents: pages 1–{splitPageInput} and pages {splitPageInput + 1}–{totalPages}.
+        <ConfirmModal
+          open={showSplitDialog}
+          title="Split Document"
+          description={`Creates two documents: pages 1–${splitPageInput} and pages ${splitPageInput + 1}–${totalPages}.`}
+          confirmLabel="Confirm Split"
+          disabled={splitPageInput < 1 || splitPageInput >= totalPages}
+          onConfirm={handleSplitConfirm}
+          onCancel={handleCloseSplitDialog}
+        >
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-gray-700">Split after page</span>
+            <input
+              type="number" min={1} max={Math.max(1, totalPages - 1)}
+              value={splitPageInput} onChange={e => setSplitPageInput(Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-200"
+            />
+          </label>
+          {affectedPrev.length > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 text-xs text-orange-800">
+              <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-orange-500" />
+              <p>
+                <span className="font-semibold">{affectedPrev.map(u => u.name).join(' and ')} </span>
+                {affectedPrev.length === 1 ? 'is' : 'are'} on page
+                {affectedPrev.length === 1
+                  ? ` ${affectedPrev[0].currentPage}`
+                  : 's ' + affectedPrev.map(u => u.currentPage).join(', ')
+                }, which falls in the section being split. They will be notified.
               </p>
-              <label className="mb-3 block">
-                <span className="mb-1 block text-xs font-medium text-gray-700">Split after page</span>
-                <input type="number" min={1} max={Math.max(1, totalPages - 1)}
-                  value={splitPageInput} onChange={e => setSplitPageInput(Number(e.target.value))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-200" />
-              </label>
-
-              {affectedPrev.length > 0 && (
-                <div className="mb-4 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 text-xs text-orange-800">
-                  <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-orange-500" />
-                  <p>
-                    <span className="font-semibold">{affectedPrev.map(u => u.name).join(' and ')} </span>
-                    {affectedPrev.length === 1 ? 'is' : 'are'} on page
-                    {affectedPrev.length === 1
-                      ? ` ${affectedPrev[0].currentPage}`
-                      : 's ' + affectedPrev.map(u => u.currentPage).join(', ')
-                    }, which falls in the section being split. They will be notified.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <button onClick={handleSplitConfirm}
-                  disabled={splitPageInput < 1 || splitPageInput >= totalPages}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40">
-                  <Scissors className="size-3.5" /> Confirm Split
-                </button>
-                <button onClick={() => setShowSplitDialog(false)}
-                  className="flex-1 rounded-lg border border-gray-200 py-2 text-sm text-gray-600 hover:bg-gray-50">
-                  Cancel
-                </button>
-              </div>
             </div>
-          </div>
-        )}
+          )}
+        </ConfirmModal>
+
+        {/* ── Delete dialog ── */}
+        <ConfirmModal
+          open={showDeleteDialog}
+          title="Delete Document"
+          description="This will permanently remove the document. This action cannot be undone."
+          confirmLabel="Delete Document"
+          variant="danger"
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleCloseDeleteDialog}
+        >
+          {presence.presence.length > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+              <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-rose-500" />
+              <p>
+                <span className="font-semibold">{presence.presence.map(u => u.name).join(' and ')} </span>
+                {presence.presence.length === 1 ? 'is' : 'are'} currently viewing this document and will lose access.
+              </p>
+            </div>
+          )}
+        </ConfirmModal>
       </div>
 
       {/* ── Floating comment bubble (fixed, outside panel) ── */}
-      {textSel.selection && bubbleStyle && (
-        <div style={bubbleStyle} className="w-80 overflow-hidden rounded-xl bg-gray-900 shadow-2xl">
-          {!showCommentForm ? (
-            <button
-              onMouseDown={e => e.preventDefault()} // preserve browser selection
-              onClick={() => setShowCommentForm(true)}
-              className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-white hover:bg-gray-800"
-            >
-              <MessageSquare className="size-4 text-violet-400" />
-              Add comment
-              <span className="ml-auto max-w-[100px] truncate text-xs text-gray-500">
-                "{textSel.selection.text}"
-              </span>
-            </button>
-          ) : (
-            <form onSubmit={handleSelectionCommentSubmit} className="p-3 space-y-2">
-              {/* Quote preview */}
-              <p className="truncate rounded bg-gray-800 px-2 py-1 text-[10px] italic text-gray-400">
-                "{textSel.selection.text.slice(0, 80)}{textSel.selection.text.length > 80 ? '…' : ''}"
-              </p>
-              <textarea
-                autoFocus
-                value={commentDraft}
-                onChange={e => setCommentDraft(e.target.value)}
-                placeholder="Add your comment…"
-                rows={3}
-                className="w-full resize-none rounded-lg bg-gray-800 px-3 py-2 text-xs text-white outline-none placeholder:text-gray-500 focus:ring-1 focus:ring-violet-500"
-              />
-              <div className="flex gap-2">
-                <button type="submit"
-                  disabled={!commentDraft.trim() || isSendingComment}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-violet-600 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50">
-                  <Send className="size-3" />
-                  {isSendingComment ? 'Posting…' : 'Post'}
-                </button>
-                <button type="button"
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={() => { setShowCommentForm(false); textSel.clearSelection(); }}
-                  className="rounded-lg px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-800">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
+      <FloatingCommentBubble
+        selection={textSel.selection}
+        onCommentPosted={handleCommentPosted}
+        onClearSelection={textSel.clearSelection}
+      />
     </>
   );
 }

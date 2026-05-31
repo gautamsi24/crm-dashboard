@@ -27,7 +27,7 @@ export function useDocumentEdit(): UseDocumentEditReturn {
   const [isEditing,  setIsEditing]  = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [edits,      setEdits]      = useState<Record<number, string>>({});
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const startEditing = useCallback(() => {
     setIsEditing(true);

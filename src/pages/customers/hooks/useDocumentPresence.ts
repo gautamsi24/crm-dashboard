@@ -13,7 +13,7 @@
  * "jumps" to a nearby page to show the UI working realistically.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { MOCK_PRESENCE_SEED, type PresenceUser } from '@/types/document';
 
 const MOVE_INTERVAL = 8_000; // ms between simulated page-changes
@@ -71,9 +71,10 @@ export function useDocumentPresence(
     [presence],
   );
 
-  const activeCount = presence.filter(
-    u => Date.now() - u.lastActive < STALE_AFTER,
-  ).length;
+  const activeCount = useMemo(
+    () => presence.filter(u => Date.now() - u.lastActive < STALE_AFTER).length,
+    [presence],
+  );
 
   return { presence, usersOnPage, activeCount };
 }

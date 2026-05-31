@@ -16,7 +16,7 @@
  *   - Role comes from the verified token; never trust client-supplied roles.
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { ROLE_PERMISSIONS, type Permission, type Role } from '@/types/auth';
 import { getUserById, type MockUser } from '@/data/mockUsers';
 
@@ -51,33 +51,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoading(false);
   }, []);
 
-  const login = (userId: string) => {
+  const login = useCallback((userId: string) => {
     const found = getUserById(userId);
     if (!found) return;
     sessionStorage.setItem(SESSION_KEY, userId);
     setUser(found);
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     sessionStorage.removeItem(SESSION_KEY);
     setUser(null);
-  };
+  }, []);
 
-  const permissions: Permission[] = user ? ROLE_PERMISSIONS[user.role] : [];
+  const permissions = useMemo<Permission[]>(
+    () => (user ? ROLE_PERMISSIONS[user.role] : []),
+    [user],
+  );
 
-  const hasPermission = (permission: Permission) => permissions.includes(permission);
+  const hasPermission = useCallback(
+    (permission: Permission) => permissions.includes(permission),
+    [permissions],
+  );
+
+  // Memoize the whole context value so consumers only re-render when
+  // something they actually care about changes.
+  const value = useMemo<AuthContextType>(() => ({
+    user,
+    role:            user?.role ?? null,
+    permissions,
+    isAuthenticated: !!user,
+    isLoading,
+    hasPermission,
+    login,
+    logout,
+  }), [user, permissions, isLoading, hasPermission, login, logout]);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      role:            user?.role ?? null,
-      permissions,
-      isAuthenticated: !!user,
-      isLoading,
-      hasPermission,
-      login,
-      logout,
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -182,10 +182,10 @@ export async function fetchDocumentMetadata(documentId: string): Promise<Custome
 // GET /api/auth/me/permissions. The frontend never receives raw role strings.
 export async function fetchCurrentUserPermissions(_userId: string): Promise<Permission[]> {
   await delay(120);
-  // Mock: import the active set that AuthContext uses.
-  // In production this would be a real network call.
-  const { EDITOR_PERMISSIONS } = await import('@/contexts/AuthContext');
-  return EDITOR_PERMISSIONS;
+  // Production: decode a signed JWT or call GET /api/auth/me/permissions.
+  // AuthContext derives permissions from ROLE_PERMISSIONS[user.role] locally,
+  // so this mock stub is unused in the current client-side flow.
+  return [];
 }
 
 // ── Comments ──────────────────────────────────────────────────────────────────

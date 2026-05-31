@@ -4,7 +4,7 @@
  * Only rendered when the user holds the 'document:comment' permission.
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { MessageSquare, CheckCircle2, Send, Quote } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DocumentComment, WorkspaceUser } from '@/types/document';
@@ -30,9 +30,12 @@ export default function CommentsSidebar({
   const [isSending,  setSending]    = useState(false);
   const [filterPage, setFilterPage] = useState<'all' | 'current'>('current');
 
-  const filtered = filterPage === 'current'
-    ? comments.filter(c => c.pageNumber === currentPage)
-    : comments;
+  const filtered = useMemo(
+    () => filterPage === 'current'
+      ? comments.filter(c => c.pageNumber === currentPage)
+      : comments,
+    [comments, currentPage, filterPage],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

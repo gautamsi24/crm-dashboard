@@ -11,7 +11,7 @@
 
 import {
   Pencil, Scissors, GitMerge, Trash2,
-  MessageSquare, Highlighter, PanelLeft, PanelRight,
+  MessageSquare, PanelLeft, PanelRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,12 +27,11 @@ interface ToolbarAction {
 }
 
 const ACTIONS: ToolbarAction[] = [
-  { key: 'edit',     label: 'Edit',     permission: 'document:edit',    icon: Pencil       },
-  { key: 'split',    label: 'Split',    permission: 'document:split',   icon: Scissors     },
-  { key: 'merge',    label: 'Merge',    permission: 'document:merge',   icon: GitMerge     },
-  { key: 'delete',   label: 'Delete',   permission: 'document:delete',  icon: Trash2,      danger: true },
-  { key: 'comment',  label: 'Comment',  permission: 'document:comment', icon: MessageSquare, separator: true },
-  { key: 'annotate', label: 'Annotate', permission: 'document:annotate',icon: Highlighter  },
+  { key: 'edit',    label: 'Edit',    permission: 'document:edit',    icon: Pencil                       },
+  { key: 'split',   label: 'Split',   permission: 'document:split',   icon: Scissors                     },
+  { key: 'merge',   label: 'Merge',   permission: 'document:merge',   icon: GitMerge                     },
+  { key: 'delete',  label: 'Delete',  permission: 'document:delete',  icon: Trash2, danger: true         },
+  { key: 'comment', label: 'Comment', permission: 'document:comment', icon: MessageSquare, separator: true },
 ];
 
 interface DocumentToolbarProps {
