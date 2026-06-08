@@ -22,11 +22,11 @@ export default function PageNavigator({
 
   return (
     <aside className="flex w-44 shrink-0 flex-col overflow-hidden border-r border-gray-100 bg-gray-50">
-      <div className="shrink-0 border-b border-gray-100 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+      <h2 className="shrink-0 border-b border-gray-100 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
         Pages
-      </div>
+      </h2>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+      <nav aria-label="Document pages" className="flex-1 overflow-y-auto p-2 space-y-0.5">
         {Array.from({ length: totalPages }, (_, i) => {
           const pageNum   = i + 1;
           const isReady   = pageNum <= pagesReady;
@@ -98,12 +98,12 @@ export default function PageNavigator({
             </button>
           );
         })}
-      </div>
+      </nav>
 
       {pagesReady < totalPages && totalPages > 0 && (
-        <div className="shrink-0 border-t border-gray-100 px-3 py-2 text-center text-[10px] text-gray-400">
+        <p aria-live="polite" className="shrink-0 border-t border-gray-100 px-3 py-2 text-center text-[10px] text-gray-400">
           {pagesReady} / {totalPages} loaded
-        </div>
+        </p>
       )}
     </aside>
   );

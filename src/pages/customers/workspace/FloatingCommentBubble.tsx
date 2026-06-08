@@ -50,9 +50,10 @@ const FloatingCommentBubble = memo(function FloatingCommentBubble({
   };
 
   return (
-    <div style={style} className="w-80 overflow-hidden rounded-xl bg-gray-900 shadow-2xl">
+    <div data-cy="floating-comment-bubble" style={style} className="w-80 overflow-hidden rounded-xl bg-gray-900 shadow-2xl">
       {!showForm ? (
         <button
+          data-cy="bubble-add-comment"
           onMouseDown={e => e.preventDefault()}
           onClick={() => setShowForm(true)}
           className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-white hover:bg-gray-800"
@@ -69,6 +70,7 @@ const FloatingCommentBubble = memo(function FloatingCommentBubble({
             "{selection.text.slice(0, 80)}{selection.text.length > 80 ? '…' : ''}"
           </p>
           <textarea
+            data-cy="bubble-comment-input"
             autoFocus
             value={draft}
             onChange={e => setDraft(e.target.value)}
@@ -78,6 +80,7 @@ const FloatingCommentBubble = memo(function FloatingCommentBubble({
           />
           <div className="flex gap-2">
             <button
+              data-cy="bubble-submit"
               type="submit"
               disabled={!draft.trim() || isSending}
               className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-violet-600 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"

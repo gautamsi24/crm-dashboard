@@ -22,6 +22,11 @@ import { getUserById, type MockUser } from '@/data/mockUsers';
 
 const SESSION_KEY = 'crm_uid';
 
+// Stable module-level reference for the unauthenticated case.
+// Avoids a separate useMemo on permissions while still giving value's
+// useMemo a reference that is === equal between renders when user is null.
+const EMPTY_PERMISSIONS: Permission[] = [];
+
 // ── Context type ─────────────────────────────────────────────────────────────
 interface AuthContextType {
   user:            MockUser | null;
@@ -51,6 +56,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoading(false);
   }, []);
 
+  // Stable references — empty deps because they only close over setUser and
+  // module-level constants, both of which never change.
   const login = useCallback((userId: string) => {
     const found = getUserById(userId);
     if (!found) return;
@@ -63,28 +70,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
   }, []);
 
-  const permissions = useMemo<Permission[]>(
-    () => (user ? ROLE_PERMISSIONS[user.role] : []),
-    [user],
-  );
-
-  const hasPermission = useCallback(
-    (permission: Permission) => permissions.includes(permission),
-    [permissions],
-  );
-
-  // Memoize the whole context value so consumers only re-render when
-  // something they actually care about changes.
-  const value = useMemo<AuthContextType>(() => ({
-    user,
-    role:            user?.role ?? null,
-    permissions,
-    isAuthenticated: !!user,
-    isLoading,
-    hasPermission,
-    login,
-    logout,
-  }), [user, permissions, isLoading, hasPermission, login, logout]);
+  // permissions and hasPermission are derived entirely from user, so they live
+  // inside the value memo rather than as separate memoized values.
+  // ROLE_PERMISSIONS entries and EMPTY_PERMISSIONS are module-level constants,
+  // so the permissions reference is always stable between renders for the same user.
+  const value = useMemo<AuthContextType>(() => {
+    const permissions = user ? ROLE_PERMISSIONS[user.role] : EMPTY_PERMISSIONS;
+    return {
+      user,
+      role:            user?.role ?? null,
+      permissions,
+      isAuthenticated: !!user,
+      isLoading,
+      hasPermission:   (permission: Permission) => permissions.includes(permission),
+      login,
+      logout,
+    };
+  }, [user, isLoading, login, logout]);
 
   return (
     <AuthContext.Provider value={value}>

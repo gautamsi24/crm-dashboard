@@ -55,10 +55,10 @@ export default function CommentsSidebar({
 
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-2.5">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
-          <MessageSquare className="size-3.5 text-gray-400" />
+        <h2 className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+          <MessageSquare className="size-3.5 text-gray-400" aria-hidden="true" />
           Comments
-        </span>
+        </h2>
         <div className="flex rounded border border-gray-200 text-[10px]">
           {(['current', 'all'] as const).map(f => (
             <button
@@ -80,22 +80,28 @@ export default function CommentsSidebar({
       {/* Comment list */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="space-y-1.5 rounded-xl border border-gray-100 p-3">
-              <div className="h-3 w-1/2 animate-pulse rounded bg-gray-100" />
-              <div className="h-3 w-full animate-pulse rounded bg-gray-100" />
-              <div className="h-3 w-3/4 animate-pulse rounded bg-gray-100" />
-            </div>
-          ))
+          <ul aria-label="Loading comments" className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <li key={i} className="space-y-1.5 rounded-xl border border-gray-100 p-3">
+                <div className="h-3 w-1/2 animate-pulse rounded bg-gray-100" />
+                <div className="h-3 w-full animate-pulse rounded bg-gray-100" />
+                <div className="h-3 w-3/4 animate-pulse rounded bg-gray-100" />
+              </li>
+            ))}
+          </ul>
         ) : filtered.length === 0 ? (
-          <div className="py-8 text-center text-xs text-gray-400">
+          <p className="py-8 text-center text-xs text-gray-400">
             No comments on{' '}
             {filterPage === 'current' ? `page ${currentPage}` : 'this document'} yet.
-          </div>
+          </p>
         ) : (
-          filtered.map(comment => (
-            <CommentCard key={comment.id} comment={comment} />
-          ))
+          <ul aria-label="Comments" className="space-y-3">
+            {filtered.map(comment => (
+              <li key={comment.id}>
+                <CommentCard comment={comment} />
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
@@ -126,7 +132,7 @@ export default function CommentsSidebar({
 
 function CommentCard({ comment }: { comment: DocumentComment }) {
   return (
-    <div
+    <article
       className={cn(
         'rounded-xl border p-3 text-xs',
         comment.resolved
@@ -135,41 +141,42 @@ function CommentCard({ comment }: { comment: DocumentComment }) {
       )}
     >
       {/* Author row */}
-      <div className="mb-2 flex items-center gap-2">
+      <header className="mb-2 flex items-center gap-2">
         <span
           className={cn(
             'flex size-5 items-center justify-center rounded-full text-[9px] font-bold text-white',
             comment.author.color,
           )}
+          aria-label={comment.author.name}
         >
           {comment.author.initials}
         </span>
         <span className="font-semibold text-gray-800">{comment.author.name}</span>
         <span className="ml-auto text-[10px] text-gray-400">p.{comment.pageNumber}</span>
-      </div>
+      </header>
 
       {/* Quoted selection */}
       {comment.selectedText && (
-        <div className="mb-2 flex gap-1.5 rounded-lg bg-gray-50 p-2">
-          <Quote className="mt-0.5 size-3 shrink-0 text-gray-300" />
+        <blockquote className="mb-2 flex gap-1.5 rounded-lg bg-gray-50 p-2">
+          <Quote className="mt-0.5 size-3 shrink-0 text-gray-300" aria-hidden="true" />
           <p className="italic leading-relaxed text-gray-400">
             {comment.selectedText.length > 100
               ? comment.selectedText.slice(0, 100) + '…'
               : comment.selectedText}
           </p>
-        </div>
+        </blockquote>
       )}
 
       <p className="leading-relaxed text-gray-600">{comment.content}</p>
 
-      <div className="mt-2 flex items-center justify-between text-[10px] text-gray-400">
-        <span>{formatTime(comment.createdAt)}</span>
+      <footer className="mt-2 flex items-center justify-between text-[10px] text-gray-400">
+        <time dateTime={comment.createdAt}>{formatTime(comment.createdAt)}</time>
         {comment.resolved && (
           <span className="flex items-center gap-1 text-emerald-500">
-            <CheckCircle2 className="size-3" /> Resolved
+            <CheckCircle2 className="size-3" aria-hidden="true" /> Resolved
           </span>
         )}
-      </div>
-    </div>
+      </footer>
+    </article>
   );
 }

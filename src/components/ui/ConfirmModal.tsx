@@ -41,9 +41,9 @@ export function ConfirmModal({
     >
       <div className="w-96 rounded-2xl bg-white p-6 shadow-2xl">
 
-        <div className="mb-1 flex items-start gap-2">
+        <header className="mb-1 flex items-start gap-2">
           {variant === 'danger' && (
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-rose-500" />
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-rose-500" aria-hidden="true" />
           )}
           <h3
             id="confirm-modal-title"
@@ -51,7 +51,7 @@ export function ConfirmModal({
           >
             {title}
           </h3>
-        </div>
+        </header>
 
         {description && (
           <p className="mb-4 text-xs text-gray-500">{description}</p>
@@ -59,7 +59,7 @@ export function ConfirmModal({
 
         {children && <div className="mb-4 space-y-3">{children}</div>}
 
-        <div className="flex gap-2">
+        <footer className="flex gap-2">
           <button
             onClick={onConfirm}
             disabled={disabled}
@@ -76,7 +76,7 @@ export function ConfirmModal({
           >
             {cancelLabel}
           </button>
-        </div>
+        </footer>
       </div>
     </div>
   );

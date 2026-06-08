@@ -133,7 +133,7 @@ export default function Layout() {
 
           {/* Dropdown menu */}
           {showUserMenu && (
-            <div className="absolute bottom-full left-3 right-3 mb-1 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+            <div className="absolute bottom-full left-3 right-3 mb-1 z-20 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
               <div className="border-b border-gray-100 px-4 py-3">
                 <p className="text-xs font-semibold text-gray-900">{user?.name}</p>
                 <p className="text-[10px] text-gray-400">{user?.email}</p>
@@ -165,7 +165,7 @@ export default function Layout() {
 
         {/* Unauthorized access banner */}
         {showUnauth && (
-          <div className="flex shrink-0 items-center justify-between gap-3 bg-rose-50 px-6 py-2.5">
+          <div role="alert" aria-live="assertive" className="flex shrink-0 items-center justify-between gap-3 bg-rose-50 px-6 py-2.5">
             <div className="flex items-center gap-2 text-sm text-rose-700">
               <AlertTriangle className="size-4 shrink-0" />
               <span>

@@ -220,7 +220,7 @@ export default function DocumentWorkspace({
       />
 
       {/* Panel */}
-      <div className={cn(
+      <div data-cy="document-workspace" className={cn(
         'fixed inset-y-0 right-0 z-50 flex w-[82%] max-w-6xl flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out',
         isOpen ? 'translate-x-0' : 'translate-x-full',
       )}>
@@ -231,7 +231,7 @@ export default function DocumentWorkspace({
             <FileText className="size-4 text-rose-500" />
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm font-semibold text-gray-900">
+            <span data-cy="workspace-filename" className="truncate text-sm font-semibold text-gray-900">
               {customer?.document.fileName ?? '—'}
             </span>
             {customer && (
@@ -258,7 +258,7 @@ export default function DocumentWorkspace({
             {networkOnline ? <><Wifi className="size-3" /> Online</> : <><WifiOff className="size-3" /> Offline</>}
           </span>
 
-          <button onClick={onClose} className="flex size-7 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
+          <button data-cy="workspace-close" onClick={onClose} className="flex size-7 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
             <X className="size-4" />
           </button>
         </header>
@@ -379,6 +379,7 @@ export default function DocumentWorkspace({
                   documentEdit.isEditing ? (
                     /* ── Edit mode: contentEditable pre (Gmail-style auto-save) ── */
                     <pre
+                      data-cy="workspace-content-edit"
                       ref={editableRef}
                       contentEditable
                       suppressContentEditableWarning
@@ -389,10 +390,11 @@ export default function DocumentWorkspace({
                   ) : (
                     /* ── View mode: read-only pre; onMouseUp fires selection hook ── */
                     <div
+                      data-cy="workspace-content-view"
                       onMouseUp={textSel.handleMouseUp}
                       className="flex-1 overflow-y-auto"
                     >
-                      <pre className="min-h-full cursor-text select-text p-6 font-mono text-xs leading-relaxed text-gray-700 whitespace-pre-wrap">
+                      <pre data-cy="workspace-content-text" className="min-h-full cursor-text select-text p-6 font-mono text-xs leading-relaxed text-gray-700 whitespace-pre-wrap">
                         {displayContent}
                       </pre>
                     </div>
@@ -424,15 +426,17 @@ export default function DocumentWorkspace({
           </p>
           <div className="flex items-center gap-2">
             <button
+              data-cy="workspace-prev-page"
               onClick={handlePrevPage}
               disabled={loader.currentPage <= 1 || !isDocReady}
               className="flex size-7 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40">
               <ChevronLeft className="size-4" />
             </button>
-            <span className="text-xs font-medium text-gray-700">
+            <span data-cy="workspace-page-indicator" className="text-xs font-medium text-gray-700">
               {loader.currentPage} / {totalPages || '—'}
             </span>
             <button
+              data-cy="workspace-next-page"
               onClick={handleNextPage}
               disabled={loader.currentPage >= totalPages || !isDocReady}
               className="flex size-7 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40">

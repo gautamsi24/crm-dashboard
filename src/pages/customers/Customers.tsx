@@ -8,7 +8,7 @@ export default function Customers() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   return (
-    <div className="flex flex-col gap-6">
+    <section aria-labelledby="customers-table-heading" className="flex flex-col gap-6">
       <CustomerSummary />
 
       <CustomersTable
@@ -20,6 +20,6 @@ export default function Customers() {
         customer={selectedCustomer}
         onClose={() => setSelectedCustomer(null)}
       />
-    </div>
+    </section>
   );
 }

@@ -142,7 +142,7 @@ export default function CustomersTable({ onRowClick, selectedCustomerId }: Custo
       {/* ── Toolbar ── */}
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 px-6 py-4">
         <div>
-          <h2 className="text-base font-bold text-gray-900">All Customers</h2>
+          <h2 id="customers-table-heading" className="text-base font-bold text-gray-900">All Customers</h2>
           <p className="mt-0.5 text-xs font-medium text-emerald-500">Active Members</p>
         </div>
 
@@ -184,7 +184,7 @@ export default function CustomersTable({ onRowClick, selectedCustomerId }: Custo
 
       {/* ── Error state ── */}
       {error && (
-        <div className="px-6 py-8 text-center text-sm text-rose-500">{error}</div>
+        <p role="alert" className="px-6 py-8 text-center text-sm text-rose-500">{error}</p>
       )}
 
       {/* ── Table ── */}
@@ -246,14 +246,14 @@ export default function CustomersTable({ onRowClick, selectedCustomerId }: Custo
 
       {/* ── Pagination footer ── */}
       {!error && !isLoading && total > 0 && (
-        <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4">
+        <nav aria-label="Pagination" className="flex items-center justify-between border-t border-gray-100 px-6 py-4">
           <p className="text-xs text-gray-400">
             Showing data <span className="font-medium text-gray-700">{from}</span> to{' '}
             <span className="font-medium text-gray-700">{to}</span> of{' '}
             <span className="font-medium text-gray-700">{total.toLocaleString()}</span> entries
           </p>
           <Pagination page={page} totalPages={totalPages} onPage={setPage} />
-        </div>
+        </nav>
       )}
     </div>
   );

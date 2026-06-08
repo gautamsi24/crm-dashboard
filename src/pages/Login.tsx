@@ -26,7 +26,7 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8F9FC] px-4 py-12">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[#F8F9FC] px-4 py-12">
 
       {/* Logo */}
       <div className="mb-10 flex items-center gap-2.5">
@@ -83,6 +83,6 @@ export default function Login() {
           })}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

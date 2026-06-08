@@ -16,7 +16,7 @@ const SplitNotificationBanner = memo(function SplitNotificationBanner({
   notification, onDismiss,
 }: SplitNotificationBannerProps) {
   return (
-    <div className="flex shrink-0 items-start justify-between gap-3 border-b border-orange-100 bg-orange-50 px-5 py-2.5">
+    <aside role="alert" aria-live="assertive" aria-atomic="true" className="flex shrink-0 items-start justify-between gap-3 border-b border-orange-100 bg-orange-50 px-5 py-2.5">
       <div className="flex items-start gap-2 text-xs text-orange-800">
         <Scissors className="mt-0.5 size-3.5 shrink-0 text-orange-500" />
         <div>
@@ -34,7 +34,7 @@ const SplitNotificationBanner = memo(function SplitNotificationBanner({
       >
         Dismiss
       </button>
-    </div>
+    </aside>
   );
 });
 

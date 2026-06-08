@@ -51,17 +51,19 @@ export default function DocumentToolbar({
   const { hasPermission } = useAuth();
 
   return (
-    <div className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-1.5">
+    <div role="toolbar" aria-label="Document actions" className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-1.5">
 
       {/* Panel toggles */}
-      <div className="flex items-center gap-1">
+      <div role="group" aria-label="Panel visibility" className="flex items-center gap-1">
         <ToggleButton
+          dataCy="toolbar-toggle-pagenav"
           icon={PanelLeft}
           active={showPageNav}
           title={showPageNav ? 'Hide page navigator' : 'Show page navigator'}
           onClick={onTogglePageNav}
         />
         <ToggleButton
+          dataCy="toolbar-toggle-comments"
           icon={PanelRight}
           active={showComments}
           title={showComments ? 'Hide comments' : 'Show comments'}
@@ -71,7 +73,7 @@ export default function DocumentToolbar({
       </div>
 
       {/* Document actions */}
-      <div className="flex items-center">
+      <div role="group" aria-label="Document operations" className="flex items-center">
         {ACTIONS.map(action => {
           const allowed  = hasPermission(action.permission);
           const isActive = action.key === 'edit' ? isEditing : false;
@@ -82,6 +84,7 @@ export default function DocumentToolbar({
                 <span className="mx-2 h-4 w-px bg-gray-200" />
               )}
               <ActionButton
+                dataCy={`toolbar-${action.key}`}
                 label={action.label}
                 icon={action.icon}
                 active={isActive}
@@ -108,21 +111,23 @@ export default function DocumentToolbar({
 // ── Internal button components ────────────────────────────────────────────────
 
 function ActionButton({
-  label, icon: Icon, active, allowed, danger, disabled, disabledReason, onClick,
+  dataCy, label, icon: Icon, active, allowed, danger, disabled, disabledReason, onClick,
 }: {
-  label:          string;
-  icon:           React.ElementType;
-  active:         boolean;
-  allowed:        boolean;
-  danger?:        boolean;
-  disabled:       boolean;
+  dataCy:          string;
+  label:           string;
+  icon:            React.ElementType;
+  active:          boolean;
+  allowed:         boolean;
+  danger?:         boolean;
+  disabled:        boolean;
   disabledReason?: string;
-  onClick:        () => void;
+  onClick:         () => void;
 }) {
   const isDisabled = disabled || !allowed;
 
   return (
     <button
+      data-cy={dataCy}
       onClick={onClick}
       disabled={isDisabled}
       title={disabledReason}
@@ -146,8 +151,9 @@ function ActionButton({
 }
 
 function ToggleButton({
-  icon: Icon, active, title, onClick, disabled,
+  dataCy, icon: Icon, active, title, onClick, disabled,
 }: {
+  dataCy:   string;
   icon:     React.ElementType;
   active:   boolean;
   title:    string;
@@ -156,6 +162,7 @@ function ToggleButton({
 }) {
   return (
     <button
+      data-cy={dataCy}
       onClick={onClick}
       disabled={disabled}
       title={title}
