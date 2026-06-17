@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, Users, DollarSign,
   Megaphone, HelpCircle, Search, ChevronRight,
   ChevronDown, Hexagon, Sparkles, LogOut, RefreshCw,
-  AlertTriangle, X,
 } from 'lucide-react';
 import { Input }               from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -23,26 +22,9 @@ const navItems = [
 
 export default function Layout() {
   const { user, logout } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
 
-  // ── Switch-user dropdown ──────────────────────────────────────────────────
   const [showUserMenu, setShowUserMenu] = useState(false);
-
-  // ── Unauthorized access banner ────────────────────────────────────────────
-  const [showUnauth, setShowUnauth] = useState(false);
-
-  useEffect(() => {
-    const state = location.state as { unauthorized?: boolean } | null;
-    if (state?.unauthorized) {
-      setShowUnauth(true);
-      // Replace the current history entry with the same path but no state,
-      // so a page refresh doesn't re-show the banner.
-      navigate(location.pathname, { replace: true, state: {} });
-      const timer = setTimeout(() => setShowUnauth(false), 6000);
-      return () => clearTimeout(timer);
-    }
-  }, [location.state, location.pathname, navigate]);
 
   const handleLogout = () => {
     logout();
@@ -162,22 +144,6 @@ export default function Layout() {
 
       {/* ── Right panel ── */}
       <div className="flex flex-1 flex-col overflow-hidden">
-
-        {/* Unauthorized access banner */}
-        {showUnauth && (
-          <div role="alert" aria-live="assertive" className="flex shrink-0 items-center justify-between gap-3 bg-rose-50 px-6 py-2.5">
-            <div className="flex items-center gap-2 text-sm text-rose-700">
-              <AlertTriangle className="size-4 shrink-0" />
-              <span>
-                <span className="font-semibold">Unauthorized access</span> — you don't have
-                permission to view that page.
-              </span>
-            </div>
-            <button onClick={() => setShowUnauth(false)} className="shrink-0 text-rose-400 hover:text-rose-600">
-              <X className="size-4" />
-            </button>
-          </div>
-        )}
 
         {/* Top header */}
         <header className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-white px-8 py-4">

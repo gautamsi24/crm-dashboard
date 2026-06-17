@@ -73,7 +73,7 @@ Then('the {string} toolbar button should be enabled', (action: string) => {
 Then('the {string} toolbar button should show a permission tooltip', (action: string) => {
   cy.get(ACTION_SELECTOR[action])
     .should('have.attr', 'title')
-    .and('match', /Requires "document:\w+" permission/);
+    .and('match', /Upgrade to .+ plan/);
 });
 
 Then('the comments panel toggle should be disabled', () => {

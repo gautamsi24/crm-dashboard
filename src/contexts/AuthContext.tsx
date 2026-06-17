@@ -5,10 +5,15 @@
  * Mounted once in App.tsx — available to every route including /login.
  *
  * Flow:
- *   1. On mount, restore session from sessionStorage.
- *   2. login(userId) sets the active user and persists to sessionStorage.
+ *   1. On mount, restore session from sessionStorage (validates expiry).
+ *   2. login(userId) sets the active user and writes a timestamped session.
  *   3. logout() clears everything; callers navigate to /login.
- *   4. hasPermission() derives from ROLE_PERMISSIONS[user.role] — no API call.
+ *   4. hasPermission() and permissionSet derive from ROLE_PERMISSIONS[user.role].
+ *
+ * Session format:
+ *   sessionStorage stores { userId, expiresAt } as JSON.
+ *   Plain user-ID strings (old format) are rejected on restore, forcing re-login.
+ *   Sessions expire after SESSION_TTL_MS (8 hours) even within the same tab.
  *
  * Production replacement:
  *   - Replace sessionStorage with a real token store (HttpOnly cookie / STS).
@@ -20,18 +25,50 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { ROLE_PERMISSIONS, type Permission, type Role } from '@/types/auth';
 import { getUserById, type MockUser } from '@/data/mockUsers';
 
-const SESSION_KEY = 'crm_uid';
+const SESSION_KEY     = 'crm_uid';
+const SESSION_TTL_MS  = 8 * 60 * 60 * 1000; // 8 hours
+
+interface SessionData {
+  userId:    string;
+  expiresAt: number; // Unix timestamp (ms)
+}
+
+function readSession(): string | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as SessionData;
+    if (typeof data.userId !== 'string' || typeof data.expiresAt !== 'number') {
+      sessionStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    if (Date.now() > data.expiresAt) {
+      sessionStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return data.userId;
+  } catch {
+    sessionStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+}
+
+function writeSession(userId: string): void {
+  const data: SessionData = { userId, expiresAt: Date.now() + SESSION_TTL_MS };
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
+}
 
 // Stable module-level reference for the unauthenticated case.
-// Avoids a separate useMemo on permissions while still giving value's
-// useMemo a reference that is === equal between renders when user is null.
-const EMPTY_PERMISSIONS: Permission[] = [];
+const EMPTY_PERMISSIONS: Permission[]           = [];
+const EMPTY_PERMISSION_SET: ReadonlySet<Permission> = new Set();
 
 // ── Context type ─────────────────────────────────────────────────────────────
 interface AuthContextType {
   user:            MockUser | null;
   role:            Role | null;
   permissions:     Permission[];
+  /** O(1) permission lookup — prefer this over iterating permissions array. */
+  permissionSet:   ReadonlySet<Permission>;
   isAuthenticated: boolean;
   isLoading:       boolean;
   hasPermission:   (permission: Permission) => boolean;
@@ -46,22 +83,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user,      setUser]      = useState<MockUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Restore session on mount
+  // Restore session on mount — validates expiry before trusting stored id.
   useEffect(() => {
-    const savedId = sessionStorage.getItem(SESSION_KEY);
-    if (savedId) {
-      const found = getUserById(savedId);
+    const userId = readSession();
+    if (userId) {
+      const found = getUserById(userId);
       if (found) setUser(found);
     }
     setIsLoading(false);
   }, []);
 
-  // Stable references — empty deps because they only close over setUser and
-  // module-level constants, both of which never change.
   const login = useCallback((userId: string) => {
     const found = getUserById(userId);
     if (!found) return;
-    sessionStorage.setItem(SESSION_KEY, userId);
+    writeSession(userId);
     setUser(found);
   }, []);
 
@@ -70,19 +105,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
   }, []);
 
-  // permissions and hasPermission are derived entirely from user, so they live
-  // inside the value memo rather than as separate memoized values.
-  // ROLE_PERMISSIONS entries and EMPTY_PERMISSIONS are module-level constants,
-  // so the permissions reference is always stable between renders for the same user.
   const value = useMemo<AuthContextType>(() => {
-    const permissions = user ? ROLE_PERMISSIONS[user.role] : EMPTY_PERMISSIONS;
+    const permissions    = user ? ROLE_PERMISSIONS[user.role] : EMPTY_PERMISSIONS;
+    const permissionSet  = user ? new Set<Permission>(permissions) : EMPTY_PERMISSION_SET;
     return {
       user,
       role:            user?.role ?? null,
       permissions,
+      permissionSet,
       isAuthenticated: !!user,
       isLoading,
-      hasPermission:   (permission: Permission) => permissions.includes(permission),
+      hasPermission:   (permission: Permission) => permissionSet.has(permission),
       login,
       logout,
     };

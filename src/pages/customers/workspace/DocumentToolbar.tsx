@@ -2,9 +2,8 @@
  * DocumentToolbar
  *
  * RBAC-aware action bar. Every action is always visible — disabled ones show
- * a tooltip explaining what permission is needed. Nothing is hidden, because
- * hiding actions silently makes the UI confusing for users who don't know what
- * features exist.
+ * a tooltip with a plain-language message (plan-upgrade hint, not an internal
+ * permission string) so users understand how to gain access.
  *
  * Phase 2: wire each handler to the real operation (canvas split, merge, etc.)
  */
@@ -15,7 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Permission } from '@/types/auth';
+import { PERMISSION_DENIED_MESSAGE, type Permission } from '@/types/auth';
 
 interface ToolbarAction {
   key:         string;
@@ -35,13 +34,13 @@ const ACTIONS: ToolbarAction[] = [
 ];
 
 interface DocumentToolbarProps {
-  isEditing:       boolean;
-  showPageNav:     boolean;
-  showComments:    boolean;
-  isDocReady:      boolean;
-  onAction:        (key: string) => void;
-  onTogglePageNav: () => void;
-  onToggleComments:() => void;
+  isEditing:        boolean;
+  showPageNav:      boolean;
+  showComments:     boolean;
+  isDocReady:       boolean;
+  onAction:         (key: string) => void;
+  onTogglePageNav:  () => void;
+  onToggleComments: () => void;
 }
 
 export default function DocumentToolbar({
@@ -49,6 +48,7 @@ export default function DocumentToolbar({
   onAction, onTogglePageNav, onToggleComments,
 }: DocumentToolbarProps) {
   const { hasPermission } = useAuth();
+  const canComment = hasPermission('document:comment');
 
   return (
     <div role="toolbar" aria-label="Document actions" className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-1.5">
@@ -66,9 +66,12 @@ export default function DocumentToolbar({
           dataCy="toolbar-toggle-comments"
           icon={PanelRight}
           active={showComments}
-          title={showComments ? 'Hide comments' : 'Show comments'}
+          title={canComment
+            ? (showComments ? 'Hide comments' : 'Show comments')
+            : PERMISSION_DENIED_MESSAGE['document:comment']
+          }
           onClick={onToggleComments}
-          disabled={!hasPermission('document:comment')}
+          disabled={!canComment}
         />
       </div>
 
@@ -95,7 +98,7 @@ export default function DocumentToolbar({
                   !isDocReady
                     ? 'Document is loading'
                     : !allowed
-                      ? `Requires "document:${action.key}" permission`
+                      ? PERMISSION_DENIED_MESSAGE[action.permission]
                       : undefined
                 }
                 onClick={() => allowed && isDocReady && onAction(action.key)}

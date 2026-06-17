@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth }                  from '@/contexts/AuthContext';
+import { Can }                      from '@/components/Can';
 import { useDocumentLoader }        from '@/pages/customers/hooks/useDocumentLoader';
 import { useDocumentResume }        from '@/pages/customers/hooks/useDocumentResume';
 import { useDocumentPresence }      from '@/pages/customers/hooks/useDocumentPresence';
@@ -410,12 +411,14 @@ export default function DocumentWorkspace({
             )}
           </div>
 
-          {showComments && hasPermission('document:comment') && (
-            <CommentsSidebar
-              comments={docComments.comments} isLoading={docComments.isLoading}
-              currentPage={loader.currentPage} currentUser={CURRENT_USER}
-              onAddComment={docComments.addComment}
-            />
+          {showComments && (
+            <Can permission="document:comment">
+              <CommentsSidebar
+                comments={docComments.comments} isLoading={docComments.isLoading}
+                currentPage={loader.currentPage} currentUser={CURRENT_USER}
+                onAddComment={docComments.addComment}
+              />
+            </Can>
           )}
         </div>
 
