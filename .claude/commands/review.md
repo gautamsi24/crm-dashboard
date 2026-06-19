@@ -1,3 +1,7 @@
+<!-- Quick pre-commit check — project-specific only. Runs in the current conversation context.
+     For a comprehensive review (TypeScript, React, performance, accessibility, Vite, Cypress),
+     spawn the code-reviewer agent instead. -->
+
 Review the current uncommitted changes (or the diff of $ARGUMENTS if a branch/commit is provided).
 
 Check for:
