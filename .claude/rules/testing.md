@@ -30,7 +30,7 @@ cypress/e2e/
 | `workspace-content-text` | Text pre (used to detect load completion) |
 | `workspace-prev-page` / `workspace-next-page` | Footer pagination buttons |
 | `workspace-page-indicator` | "X / Y" page counter |
-| `toolbar-edit` / `toolbar-split` / `toolbar-merge` / `toolbar-delete` / `toolbar-comment` | Action buttons |
+| `toolbar-edit` / `toolbar-split` / `toolbar-merge` / `toolbar-delete` / `toolbar-comment` / `toolbar-ai` | Action buttons |
 | `toolbar-toggle-pagenav` / `toolbar-toggle-comments` | Panel toggle buttons |
 | `floating-comment-bubble` | Selection bubble root |
 | `bubble-add-comment` / `bubble-comment-input` / `bubble-submit` | Bubble form elements |

@@ -14,7 +14,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import {
   X, FileText, Loader2, ChevronLeft, ChevronRight,
-  AlertCircle, Wifi, WifiOff, RefreshCw, Eye,
+  AlertCircle, Wifi, WifiOff, RefreshCw, Eye, Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth }                  from '@/contexts/AuthContext';
@@ -34,6 +34,7 @@ import SplitNotificationBanner      from '@/pages/customers/workspace/SplitNotif
 import EditStatusBar                from '@/pages/customers/workspace/EditStatusBar';
 import FloatingCommentBubble        from '@/pages/customers/workspace/FloatingCommentBubble';
 import { ConfirmModal }             from '@/components/ui/ConfirmModal';
+import { summarizeDocument }         from '@/lib/mockApi';
 import type { Customer }            from '@/lib/mockApi';
 import type { PresenceUser }        from '@/types/document';
 import type { SplitNotification }   from '@/pages/customers/workspace/SplitNotificationBanner';
@@ -73,6 +74,8 @@ export default function DocumentWorkspace({
   const [showDeleteDialog,  setShowDeleteDialog]  = useState(false);
   const [splitPageInput,    setSplitPageInput]    = useState(1);
   const [splitNotification, setSplitNotification] = useState<SplitNotification | null>(null);
+  const [summaryPhase,      setSummaryPhase]      = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [summary,           setSummary]           = useState<string[]>([]);
 
   // ── Pre-compute presence page map ─────────────────────────────────────────
   // Avoids calling usersOnPage() (a filter) N times inside PageNavigator's
@@ -103,7 +106,7 @@ export default function DocumentWorkspace({
   useEffect(() => {
     documentEdit.stopEditing();
     setShowComments(false); setShowSplitDialog(false); setShowDeleteDialog(false);
-    setSplitNotification(null);
+    setSplitNotification(null); setSummaryPhase('idle');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId]);
 
@@ -127,13 +130,29 @@ export default function DocumentWorkspace({
     loader.setCurrentPage(page); resume.savePosition(page);
   }, [loader.setCurrentPage, resume.savePosition]);
 
+  // ── AI Summarize ──────────────────────────────────────────────────────────
+  const handleSummarize = useCallback(async () => {
+    setSummaryPhase('loading');
+    const pageText = loader.doc?.pages[loader.currentPage - 1]?.content ?? '';
+    try {
+      const result = await summarizeDocument(pageText);
+      setSummary(result.bullets);
+      setSummaryPhase('ready');
+    } catch {
+      setSummaryPhase('error');
+    }
+  }, [loader.doc, loader.currentPage]);
+
+  const handleDismissSummary = useCallback(() => setSummaryPhase('idle'), []);
+
   // ── Toolbar actions ───────────────────────────────────────────────────────
   const handleAction = useCallback((key: string) => {
     if (key === 'edit')    { documentEdit.isEditing ? documentEdit.stopEditing() : documentEdit.startEditing(); return; }
     if (key === 'comment') { setShowComments(c => !c); return; }
     if (key === 'split')   { setSplitPageInput(Math.max(1, Math.min(loader.currentPage, totalPages - 1))); setShowSplitDialog(true); return; }
     if (key === 'delete')  { setShowDeleteDialog(true); return; }
-  }, [documentEdit.isEditing, documentEdit.stopEditing, documentEdit.startEditing, loader.currentPage, totalPages]);
+    if (key === 'ai')      { void handleSummarize(); return; }
+  }, [documentEdit.isEditing, documentEdit.stopEditing, documentEdit.startEditing, loader.currentPage, totalPages, handleSummarize]);
 
   // ── Split confirm ─────────────────────────────────────────────────────────
   const handleSplitConfirm = useCallback(() => {
@@ -298,6 +317,36 @@ export default function DocumentWorkspace({
             saveStatus={documentEdit.saveStatus}
             onStopEditing={documentEdit.stopEditing}
           />
+        )}
+
+        {/* ── AI Summary panel ── */}
+        {summaryPhase !== 'idle' && (
+          <div className="shrink-0 border-b border-violet-100 bg-violet-50 px-5 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <Sparkles className="mt-0.5 size-3.5 shrink-0 text-violet-500" />
+                {summaryPhase === 'loading' && (
+                  <span className="flex items-center gap-1.5 text-xs text-violet-600">
+                    <Loader2 className="size-3 animate-spin" /> Generating summary…
+                  </span>
+                )}
+                {summaryPhase === 'error' && (
+                  <span className="text-xs text-rose-600">Failed to generate summary. Try again.</span>
+                )}
+                {summaryPhase === 'ready' && (
+                  <ul className="space-y-1">
+                    {summary.map((bullet, i) => (
+                      <li key={i} className="text-xs text-violet-800">• {bullet}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button onClick={handleDismissSummary} title="Dismiss summary"
+                className="shrink-0 text-violet-400 hover:text-violet-600">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          </div>
         )}
 
         {/* ── Loading progress ── */}

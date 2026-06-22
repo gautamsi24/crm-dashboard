@@ -24,6 +24,7 @@ export type Permission =
   | 'document:delete'
   | 'document:comment'
   | 'document:annotate'
+  | 'document:ai'
   | 'customer:view'
   | 'customer:create'
   | 'customer:edit'
@@ -40,7 +41,7 @@ const ROLE_PARENT: Record<Role, Role | null> = {
 // Permissions introduced at each tier — not re-listed from parents.
 const ROLE_OWN_PERMISSIONS: Record<Role, Permission[]> = {
   user:      ['document:view', 'customer:view'],
-  proUser:   ['document:edit', 'document:comment', 'document:annotate', 'customer:create', 'customer:edit'],
+  proUser:   ['document:edit', 'document:comment', 'document:annotate', 'document:ai', 'customer:create', 'customer:edit'],
   superUser: ['document:split', 'document:merge', 'document:delete'],
   admin:     ['customer:delete'],
 };
@@ -85,6 +86,7 @@ export const PERMISSION_DENIED_MESSAGE: Record<Permission, string> = {
   'document:split':    'Upgrade to Business plan to split documents',
   'document:merge':    'Upgrade to Business plan to merge documents',
   'document:delete':   'Upgrade to Business plan to delete documents',
+  'document:ai':       'Upgrade to Pro plan to use AI document features',
   'customer:view':     'Customer access is not available on your current plan',
   'customer:create':   'Upgrade to Pro plan to create customers',
   'customer:edit':     'Upgrade to Pro plan to edit customers',

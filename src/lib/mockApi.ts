@@ -250,3 +250,22 @@ export async function addDocumentComment(
   ensureComments(documentId).push(comment);
   return comment;
 }
+
+// ── AI Document Summary ───────────────────────────────────────────────────────
+export interface DocumentSummary {
+  bullets: string[];
+}
+
+// Production: POST https://api.anthropic.com/v1/messages with model claude-haiku-4-5-20251001.
+// Pass `import.meta.env.VITE_ANTHROPIC_KEY` as the x-api-key header — same return shape, no call-site changes.
+export async function summarizeDocument(pageText: string): Promise<DocumentSummary> {
+  await delay(1200);
+  const lines = pageText.split('\n').filter(l => l.trim().length > 20);
+  return {
+    bullets: [
+      `This section covers ${lines[3]?.trim().toLowerCase() ?? 'key contractual terms'}.`,
+      `Contains ${lines.length} substantive clauses with binding obligations for both parties.`,
+      'Amendments require written consent from authorized representatives.',
+    ],
+  };
+}

@@ -4,14 +4,14 @@ A React 19 single-page application featuring a collaborative document workspace 
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | React 19 + TypeScript (strict) |
-| Routing | React Router v7 |
-| Styling | Tailwind CSS v4 |
-| Build | Vite 8 |
-| UI primitives | Radix UI + shadcn/ui |
-| Testing | Cypress 15 + Cucumber BDD |
+| Layer          | Technology                     |
+| -------------- | ------------------------------ |
+| Framework      | React 19 + TypeScript (strict) |
+| Routing        | React Router v7                |
+| Styling        | Tailwind CSS v4                |
+| Build          | Vite 8                         |
+| UI primitives  | Radix UI + shadcn/ui           |
+| Testing        | Cypress 15 + Cucumber BDD      |
 
 ## Key Commands
 
@@ -26,7 +26,7 @@ npm run cy:run:headed # Cypress headed (useful for debugging)
 
 ## Project Structure
 
-```
+```text
 src/
 ├── App.tsx                        # Root router — AuthProvider wraps everything
 ├── contexts/
@@ -44,6 +44,7 @@ src/
 │   └── mockCustomers.ts
 ├── lib/
 │   └── mockApi.ts                 # All "API" calls — swap for real fetch here
+│                                  # Includes summarizeDocument() AI stub
 └── pages/
     └── customers/
         ├── DocumentWorkspace.tsx  # Orchestrates all document feature hooks
@@ -56,13 +57,17 @@ src/
 ## Architecture Notes
 
 ### RBAC
+
 Permissions derive from a role hierarchy (`user → proUser → superUser → admin`) defined in `src/types/auth.ts`. Each role only declares the permissions it *adds*; the rest are inherited. Never check `user.role` directly in components — always check `hasPermission()` or use `<Can>`.
 
 ### Session
+
 Sessions are stored as `{ userId, expiresAt }` JSON in `sessionStorage` with an 8-hour TTL. Plain strings are rejected on restore (prevents trivial DevTools injection). Replace `readSession` / `writeSession` in `AuthContext.tsx` with real JWT handling when adding a backend.
 
 ### Mock API
-`src/lib/mockApi.ts` is the single seam between UI and data. All mutations and fetches go through it. When adding a real backend, replace function bodies without changing call sites.
+
+`src/lib/mockApi.ts` is the single seam between UI and data. All mutations and fetches go through it. When adding a real backend, replace function bodies without changing call sites. The `summarizeDocument()` function is a mock stub — replace its body with a real Anthropic API call and set `VITE_ANTHROPIC_KEY` in `.env.local`.
 
 ### Permission messages
+
 `PERMISSION_DENIED_MESSAGE` in `auth.ts` maps every permission to a plan-upgrade hint shown to users (e.g. "Upgrade to Business plan to split documents"). Never expose raw permission strings in UI copy.

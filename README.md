@@ -1,6 +1,6 @@
 # CRM Dashboard
 
-A React 19 single-page application that lets authenticated users browse a customer list, view customer documents in a collaborative workspace, and manage them (edit, comment, split, delete) according to their role-based permissions.
+A React 19 single-page application that lets authenticated users browse a customer list, view customer documents in a collaborative workspace, and manage them (edit, comment, split, delete, AI summarize) according to their role-based permissions.
 
 ---
 
@@ -104,7 +104,9 @@ src/
 ├── lib/
 │   ├── mockApi.ts                  All "API" functions: fetchCustomers,
 │   │                               fetchDocument, fetchDocumentMetadata,
-│   │                               fetchDocumentComments, addDocumentComment.
+│   │                               fetchDocumentComments, addDocumentComment,
+│   │                               summarizeDocument (AI — mock stub, replace
+│   │                               with Anthropic API call in production).
 │   │                               Simulates latency and progressive loading.
 │   └── utils.ts                    cn() — Tailwind class merging helper
 │
@@ -126,7 +128,7 @@ src/
 │       │   └── useTextSelection.ts     Mouse-up selection → floating comment bubble
 │       │
 │       └── workspace/              Focused sub-components of DocumentWorkspace
-│           ├── DocumentToolbar.tsx         RBAC-aware action bar (Edit/Split/Merge/Delete/Comment)
+│           ├── DocumentToolbar.tsx         RBAC-aware action bar (Edit/Split/Merge/Delete/Comment/Summarize)
 │           ├── PageNavigator.tsx           Left sidebar with clickable page thumbnails + presence dots
 │           ├── CommentsSidebar.tsx         Right sidebar for page-level comments
 │           ├── EditStatusBar.tsx           Auto-save indicator + "Done editing" button
@@ -135,7 +137,8 @@ src/
 │           └── FloatingCommentBubble.tsx   Fixed-position bubble for selection-based comments
 │
 └── types/
-    ├── auth.ts       Role, Permission, ROLE_PERMISSIONS, ROLE_LABEL
+    ├── auth.ts       Role, Permission, ROLE_PERMISSIONS, ROLE_LABEL,
+    │                 PERMISSION_DENIED_MESSAGE, resolvePermissions()
     ├── document.ts   LoadPhase, PresenceUser, DocumentComment, ResumePoint
     └── workspace.ts  Shared workspace types
 ```
@@ -144,22 +147,22 @@ src/
 
 ## Authentication & RBAC
 
-Session state is stored in `sessionStorage` under the key `crm_uid`. On mount, `AuthContext` reads this key and restores the session without a network call.
+Session state is stored in `sessionStorage` under the key `crm_uid` as JSON (`{ userId, expiresAt }`), with an 8-hour TTL. On mount, `AuthContext` validates the shape and expiry before restoring — plain strings are rejected to prevent trivial DevTools impersonation. Replace `readSession` / `writeSession` in `AuthContext.tsx` with JWT decode / refresh logic when adding a real backend.
 
 ### Demo accounts
 
-| Name          | Role        | Plan       | Permissions                                    |
-| ------------- | ----------- | ---------- | ---------------------------------------------- |
-| Alice Reader  | `user`      | Free       | View customers and documents (read-only)       |
-| Bob Creator   | `proUser`   | Pro        | + Edit documents, add comments                 |
-| Carol Manager | `superUser` | Business   | + Split, merge, and delete documents           |
-| Dave Admin    | `admin`     | Enterprise | Full access including customer delete          |
+| Name          | Role        | Plan       | Permissions                                       |
+| ------------- | ----------- | ---------- | ------------------------------------------------- |
+| Alice Reader  | `user`      | Free       | View customers and documents (read-only)          |
+| Bob Creator   | `proUser`   | Pro        | + Edit, comment, annotate documents, AI summarize |
+| Carol Manager | `superUser` | Business   | + Split, merge, and delete documents              |
+| Dave Admin    | `admin`     | Enterprise | Full access including customer delete             |
 
 ### How permissions work
 
 `ROLE_PERMISSIONS` in `src/types/auth.ts` maps each role to a flat list of `Permission` strings (e.g. `"document:edit"`, `"document:split"`). Components call `hasPermission(permission)` from `useAuth()` — no role strings leak into UI logic.
 
-`ProtectedRoute` enforces both authentication and optional permission checks at the route level. Unauthorized access redirects to `/` and shows a dismissible banner.
+`ProtectedRoute` enforces both authentication and optional permission checks at the route level. Unauthorized access renders an inline 403 view inside the layout shell (sidebar still visible) with a link back to the dashboard — no redirect, no location-state coupling.
 
 ---
 
@@ -185,15 +188,56 @@ Clicking any customer row in the table opens a slide-in `DocumentWorkspace` pane
 
 ### Toolbar actions (RBAC-gated)
 
-| Action  | Required permission  |
-| ------- | -------------------- |
-| Edit    | `document:edit`      |
-| Split   | `document:split`     |
-| Merge   | `document:merge`     |
-| Delete  | `document:delete`    |
-| Comment | `document:comment`   |
+| Action    | Required permission | Minimum plan | Notes                                          |
+| --------- | ------------------- | ------------ | ---------------------------------------------- |
+| Edit      | `document:edit`     | Pro          | contentEditable; auto-saves after 1.5 s        |
+| Split     | `document:split`    | Business     | Opens ConfirmModal; warns affected viewers     |
+| Merge     | `document:merge`    | Business     | Stub — Phase 2                                 |
+| Delete    | `document:delete`   | Business     | Opens ConfirmModal with danger variant         |
+| Comment   | `document:comment`  | Pro          | Toggles comments sidebar                       |
+| Summarize | `document:ai`       | Pro          | Generates 3-bullet AI summary of current page  |
 
-Split and Delete both open a `ConfirmModal` before proceeding. The Split dialog additionally warns if any present users are on the pages that will be affected.
+Every action is always rendered; disabled buttons show a plain-language plan-upgrade tooltip drawn from `PERMISSION_DENIED_MESSAGE` in `auth.ts` — never an internal permission string.
+
+---
+
+## AI Features
+
+### Document Summarize (`document:ai`)
+
+Clicking **Summarize** in the toolbar generates a 3-bullet summary of the current page. The result appears in an inline panel below the toolbar and is dismissed with `✕`. The panel resets automatically when a different document is opened.
+
+| Detail       | Value                                                  |
+| ------------ | ------------------------------------------------------ |
+| Permission   | `document:ai`                                          |
+| Minimum plan | Pro                                                    |
+| Phase        | Loading spinner → 3 bullet points → dismissible        |
+| Resets on    | Document change                                        |
+| Mock stub    | `src/lib/mockApi.ts → summarizeDocument()`             |
+
+#### Connecting a real LLM
+
+The mock in `summarizeDocument()` returns a fixed response after 1.2 s. To wire up a real model, replace the function body in `src/lib/mockApi.ts`:
+
+```ts
+const res = await fetch('https://api.anthropic.com/v1/messages', {
+  method: 'POST',
+  headers: {
+    'x-api-key': import.meta.env.VITE_ANTHROPIC_KEY,
+    'anthropic-version': '2023-06-01',
+    'content-type': 'application/json',
+  },
+  body: JSON.stringify({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 300,
+    messages: [{ role: 'user', content: `Summarize this document page in 3 bullets:\n\n${pageText}` }],
+  }),
+});
+const { content } = await res.json();
+return { bullets: content[0].text.split('\n').filter(Boolean) };
+```
+
+Add `VITE_ANTHROPIC_KEY=sk-ant-...` to `.env.local`. No call-site changes needed — `DocumentWorkspace.tsx` calls `summarizeDocument()` the same way regardless.
 
 ---
 

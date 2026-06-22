@@ -26,6 +26,23 @@ A plain string is rejected by `readSession()` in `AuthContext.tsx`, forcing re-l
 | Render gate | `src/components/Can.tsx` |
 | Event handler guard | `src/hooks/useAuthorizedAction.ts` |
 
+### Current permissions
+
+| Permission      | Minimum role | Plan       |
+| --------------- | ------------ | ---------- |
+| `document:view` | `user`       | Free       |
+| `document:edit` | `proUser`    | Pro        |
+| `document:comment` | `proUser` | Pro        |
+| `document:annotate` | `proUser` | Pro       |
+| `document:ai`   | `proUser`    | Pro        |
+| `document:split` | `superUser` | Business   |
+| `document:merge` | `superUser` | Business   |
+| `document:delete` | `superUser` | Business  |
+| `customer:view` | `user`       | Free       |
+| `customer:create` | `proUser`  | Pro        |
+| `customer:edit` | `proUser`    | Pro        |
+| `customer:delete` | `admin`    | Enterprise |
+
 ### Adding a new permission
 1. Add the string literal to the `Permission` union in `auth.ts`
 2. Add it to `ROLE_OWN_PERMISSIONS` at the lowest tier that should have it (inherited roles get it automatically)
@@ -37,7 +54,8 @@ These values are calibrated for a realistic demo feel. Changing them affects loa
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
-| Network latency | 350 ms | `delay()` in mockApi.ts |
+| Network latency | 350 ms | `delay()` in mockApi.ts — most endpoints |
+| AI summarize latency | 1 200 ms | `summarizeDocument()` mock — replace with real API call |
 | Auto-save debounce | 1 500 ms | Inactivity before saving edits |
 | Search debounce | 300 ms | Input → API params |
 | Resume save debounce | 1 500 ms | Page position persistence |
